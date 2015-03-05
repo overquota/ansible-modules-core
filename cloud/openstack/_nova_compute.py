@@ -115,7 +115,7 @@ options:
      default: None
    nics:
      description:
-        - A list of network id's to which the VM's interface should be attached
+        - A list of network id's/name's to which the VM's interface should be attached
      required: false
      default: None
    auto_floating_ip:
@@ -214,6 +214,8 @@ EXAMPLES = '''
       key_name: test
       wait_for: 200
       flavor_id: 101
+      nics:
+        - name: SANDBOX
       security_groups: default
       auto_floating_ip: yes
 
@@ -416,12 +418,23 @@ def _get_flavor_id(module, nova):
     return module.params['flavor_id']
 
 
+def _get_network_ids(nics, nova):
+    new_nics = []
+    for net in nics:
+        if 'name' in net:
+            netid = {'net-id': nova.networks.find(label=net['name']).id}
+            new_nics.append(netid)
+        else:
+            new_nics.append(net)
+    return new_nics
+
+
 def _create_server(module, nova):
     image_id = _get_image_id(module, nova)
     flavor_id = _get_flavor_id(module, nova)
     bootargs = [module.params['name'], image_id, flavor_id]
     bootkwargs = {
-                'nics' : module.params['nics'],
+                'nics' : _get_network_ids(module.params['nics'], nova),
                 'meta' : module.params['meta'],
                 'security_groups': module.params['security_groups'].split(','),
                 #userdata is unhyphenated in novaclient, but hyphenated here for consistency with the ec2 module:
